@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+    <name>Convert to ASS</name>
+    <id>convert_to_ass</id>
+    <param name="output_format" type="optiongroup" appearance="radio"
+        gui-text="Output Format">
+        <option value="drawing" default="true">Drawing</option>
+        <option value="clip">\clip</option>
+        <option value="iclip">\iclip</option>
+        <option value="line">Line</option>
+    </param>
+    <effect needs-live-preview="false">
+        <effects-menu>
+            <submenu name="Export"/>
+        </effects-menu>
+    </effect>
+    <script>
+        <command location="inx" interpreter="python">convert_to_ass.py</command>
+    </script>
+</inkscape-extension>
