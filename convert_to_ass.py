@@ -16,6 +16,8 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+__version__ = "1.0.1"
+
 import inkex
 
 
@@ -64,48 +66,74 @@ class ConvertToASS(inkex.EffectExtension):
             value = max(0, min(1, float(value)))
             return f"&H{int((1 - value) * 255):02X}&"
 
-        def color_to_bgr(color_str):
+        def get_color_attribute(style, attrib):
+            color_attr = style.get(attrib)
+            if not color_attr or color_attr == "none":
+                return "black"
+
+            color_str = None
+            # Get first color of the gradient for now
+            if color_attr and color_attr.startswith("url("):
+                gradient_id = color_attr[5:-1]  # Extract the ID between 'url(#' and ')'
+
+                # Retrieve the gradient object by its ID
+                gradient = self.svg.getElementById(gradient_id)
+
+                if isinstance(gradient, inkex.LinearGradient):
+                    start_stop = gradient.stops[1]
+                    style = start_stop.specified_style()
+                    color_str = style.get("stop-color")
+                # TODO: Add support for linear gradients.
+                #     # Retrieve gradient attributes
+                #     x1 = gradient.get("x1", "0%")
+                #     y1 = gradient.get("y1", "0%")
+                #     x2 = gradient.get("x2", "100%")
+                #     y2 = gradient.get("y2", "0%")
+                #     # Process stops
+                #     for stop in gradient.stops:
+                #         style = stop.specified_style()
+                #         color = style.get("stop-color")
+                #         opacity = style.get("stop-opacity")
+                #         offset = stop.attrib.get("offset")
+                # elif isinstance(gradient, inkex.RadialGradient):
+                #     inkex.utils.debug("It's radial gradient.")
+                #     # self.process_radial_gradient(gradient)
+            else:
+                color_str = color_attr
+
+            if not color_str:
+                return False
+
             try:
                 color = inkex.Color(color_str)
                 r, g, b = color.to_rgb()
                 bgr_hex = f"&H{b:02X}{g:02X}{r:02X}&"
                 return bgr_hex
-            # Catch exception due to color of gradient. Gradient is ignored for now.
-            # TODO: In case of gradient, grab the first stop color until full support for gradient is added.
             except inkex.ColorIdError:
                 return False
-
-        def get_attribute(style, attrib):
-            if attrib not in style:
-                return False
-            attr = style.get(attrib)
-            if attr and attr != "none":
-                return attr
 
         style = elem.specified_style()
         ass_tags = {"an": 7, "bord": 0, "shad": 0, "pos": [0, 0]}
 
-        if fill_color := get_attribute(style, "fill"):
-            if color := color_to_bgr(fill_color):
-                ass_tags["c"] = color
+        if fill_color := get_color_attribute(style, "fill"):
+            ass_tags["c"] = fill_color
 
-            if fill_opacity := get_attribute(style, "fill-opacity"):
+            if fill_opacity := style.get("fill-opacity"):
                 ass_tags["1a"] = decimal_to_hex(fill_opacity)
 
-        if stroke_color := get_attribute(style, "stroke"):
-            if color := color_to_bgr(stroke_color):
-                ass_tags["3c"] = color
+        if stroke_color := get_color_attribute(style, "stroke"):
+            ass_tags["3c"] = stroke_color
 
-            if stroke_width := get_attribute(style, "stroke-width"):
+            if stroke_width := style.get("stroke-width"):
                 stroke_width = (
                     int(stroke_width) if stroke_width.isdigit() else float(stroke_width)
                 )
                 # Due to the different semantics of SVG strokes and ASS borders, I'm hard-coding a factor by which we'll change the stroke width
-                # This is most likely wrong.
+                # This only works for some stroke order.
                 stroke_width = stroke_width * 0.52549918642
                 ass_tags["bord"] = round(stroke_width, 2)
 
-            if stroke_opacity := get_attribute(style, "stroke-opacity"):
+            if stroke_opacity := style.get("stroke-opacity"):
                 ass_tags["3a"] = decimal_to_hex(stroke_opacity)
 
         ass_tags["p"] = 1
