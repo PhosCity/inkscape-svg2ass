@@ -1,6 +1,8 @@
 # inkscape-svg2ass
 
-Inkscape extension to export selected objects Advanced SubStation Alpha (.ass) format
+Inkscape extension to export selected objects Advanced SubStation Alpha (.ass) format.
+
+![Screenshot_2024-10-31-11-44-54](https://github.com/user-attachments/assets/ef106948-1bc0-4c42-a91a-0e3b481e5e05)
 
 ## Install
 
@@ -8,7 +10,7 @@ Copy extension files `convert_to_ass.inx` and `convert_to_ass.py` into your exte
 
 ## Usage
 
-Select the objects you want to export and from the Extensions menu choose `Export` and `Convert to ASS`.
+Select the objects you want to export and from the Extensions menu choose `Export` and `Convert to ASS`. If the svg was not authored in Inkscape or gimp, I cannot guarantee correct output.
 
 ## Supported SVG elements
 
