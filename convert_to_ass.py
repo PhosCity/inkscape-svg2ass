@@ -76,14 +76,13 @@ class ConvertToASS(inkex.EffectExtension):
                 return False
 
         def get_attribute(style, attrib):
-            attr = elem.attrib.get(attrib)
-            if attrib in style:
-                attr = style.get(attrib)
+            if attrib not in style:
+                return False
+            attr = style.get(attrib)
             if attr and attr != "none":
                 return attr
-            return False
 
-        style = elem.style
+        style = elem.specified_style()
         ass_tags = {"an": 7, "bord": 0, "shad": 0, "pos": [0, 0]}
 
         if fill_color := get_attribute(style, "fill"):
@@ -98,11 +97,13 @@ class ConvertToASS(inkex.EffectExtension):
                 ass_tags["3c"] = color
 
             if stroke_width := get_attribute(style, "stroke-width"):
-                ass_tags["bord"] = (
-                    int(stroke_width)
-                    if stroke_width.isdigit()
-                    else round(float(stroke_width), 2)
+                stroke_width = (
+                    int(stroke_width) if stroke_width.isdigit() else float(stroke_width)
                 )
+                # Due to the different semantics of SVG strokes and ASS borders, I'm hard-coding a factor by which we'll change the stroke width
+                # This is most likely wrong.
+                stroke_width = stroke_width * 0.52549918642
+                ass_tags["bord"] = round(stroke_width, 2)
 
             if stroke_opacity := get_attribute(style, "stroke-opacity"):
                 ass_tags["3a"] = decimal_to_hex(stroke_opacity)
@@ -120,7 +121,7 @@ class ConvertToASS(inkex.EffectExtension):
                 value_str = str(value)
             tags.append(f"\\{key}{value_str}")
         tags_string = "{" + "".join(tags) + "}"
-        path = path.strip()
+
         if self.options.output_format == "drawing":
             line = tags_string + path
         elif self.options.output_format == "clip":
@@ -152,26 +153,37 @@ class ConvertToASS(inkex.EffectExtension):
             ass_tags = self.create_ass_tags(elem)
             return self.generate_lines(path, ass_tags)
 
+    def recurse_into_group(self, group):
+        lines = []
+        for child in group:
+            if isinstance(child, inkex.Group):
+                self.recurse_into_group(child)
+            elif isinstance(child, inkex.ShapeElement):
+                line = self.process_svg_element(child)
+                if line := self.process_svg_element(child):
+                    lines.append(line)
+        return lines
+
     def effect(self):
         lines = []
 
-        selection_list = self.svg.selected
-
+        # This grabs selected objects by z-order, ordered from bottom to top
+        selection_list = self.svg.selection.rendering_order()
         if len(selection_list) < 1:
             inkex.errormsg("No object was selected!")
             return
 
         for elem in selection_list:
-            if elem.TAG == "g":
-                for child in elem.iterchildren():
-                    line = self.process_svg_element(child)
-                    if line:
-                        lines.append(line)
-            else:
+            if isinstance(elem, inkex.Group):
+                group_lines = self.recurse_into_group(elem)
+                if len(group_lines):
+                    lines.extend(group_lines)
+            elif isinstance(elem, inkex.ShapeElement):
                 line = self.process_svg_element(elem)
                 if line:
                     lines.append(line)
-        for line in reversed(lines):
+
+        for line in lines:
             inkex.utils.debug(line)
 
 
