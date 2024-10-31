@@ -4,7 +4,7 @@ Inkscape extension to export selected objects Advanced SubStation Alpha (.ass) f
 
 ## Install
 
-Copy extension files `multipage_export.inx` and `multipage_export.py` into your extension directory. This is the directory listed at `Edit > Preferences > System: User extensions.` in Inkscape.
+Copy extension files `convert_to_ass.inx` and `convert_to_ass.py` into your extension directory. This is the directory listed at `Edit > Preferences > System: User extensions.` in Inkscape.
 
 ## Usage
 

@@ -32,7 +32,7 @@ class ConvertToASS(inkex.EffectExtension):
         elem = elem.to_absolute()
 
         # After this, path will now contain only M, L, C, and Z commands
-        path = ""
+        path = []
         prevCmd = None
         for idx, segment in enumerate(elem):
             cmd = segment.letter
@@ -40,27 +40,24 @@ class ConvertToASS(inkex.EffectExtension):
             # Round the values to three digits
             args = [round(num, 3) if isinstance(num, float) else num for num in args]
             if cmd == "M":
-                path += f"m {args[0]} {args[1]}"
-                startX = args[0]
-                startY = args[1]
-
+                path.append("m")
+                path.extend(args)
+                startX, startY = args
             elif cmd == "L":
                 if prevCmd != cmd:
-                    path += " l"
-                path += f" {args[0]} {args[1]}"
-
+                    path.append("l")
+                path.extend(args)
             elif cmd == "C":
                 if prevCmd != cmd:
-                    path += " b"
-                path += f" {args[0]} {args[1]} {args[2]} {args[3]} {args[4]} {args[5]}"
-
+                    path.append("b")
+                path.extend(args)
             elif cmd == "Z":
                 if prevCmd != "L":
-                    path += " l"
-                path += f" {startX} {startY} "
+                    path.append("l")
+                path.extend([startX, startY])
                 del startX, startY
             prevCmd = cmd
-        return path
+        return " ".join(map(str, path))
 
     def create_ass_tags(self, elem):
         def decimal_to_hex(value):
@@ -74,6 +71,7 @@ class ConvertToASS(inkex.EffectExtension):
                 bgr_hex = f"&H{b:02X}{g:02X}{r:02X}&"
                 return bgr_hex
             # Catch exception due to color of gradient. Gradient is ignored for now.
+            # TODO: In case of gradient, grab the first stop color until full support for gradient is added.
             except inkex.ColorIdError:
                 return False
 
@@ -155,17 +153,6 @@ class ConvertToASS(inkex.EffectExtension):
             return self.generate_lines(path, ass_tags)
 
     def effect(self):
-        page_list = self.svg.xpath("//inkscape:transform")
-
-        if len(page_list) > 1:
-            page_x_translate_list = []
-
-            for page in page_list:
-                x_translate = page.get("x")
-                y_translate = page.get("y")
-                page_x_translate_list.append([x_translate, y_translate])
-            inkex.errormsg(page_x_translate_list)
-
         lines = []
 
         selection_list = self.svg.selected
