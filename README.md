@@ -12,7 +12,7 @@ Copy extension files `convert_to_ass.inx` and `convert_to_ass.py` into your exte
 
 Select the objects you want to export and from the Extensions menu choose `Export` and `Convert to ASS`. If the svg was not authored in Inkscape or gimp, I cannot guarantee correct output.
 
-![usage_video](./assets/usage.mp4)
+https://github.com/user-attachments/assets/979fc588-91e3-493a-b03c-0bfd34fa545d
 
 ## Supported SVG elements
 
