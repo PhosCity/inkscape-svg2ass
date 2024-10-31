@@ -4,10 +4,10 @@
     <id>convert_to_ass</id>
     <param name="output_format" type="optiongroup" appearance="radio"
         gui-text="Output Format">
-        <option value="drawing" default="true">Drawing</option>
+        <option value="line" default="true">Line</option>
+        <option value="drawing">Drawing</option>
         <option value="clip">\clip</option>
         <option value="iclip">\iclip</option>
-        <option value="line">Line</option>
     </param>
     <effect needs-live-preview="false">
         <effects-menu>
