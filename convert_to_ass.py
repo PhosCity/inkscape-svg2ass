@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 import inkex
 
@@ -40,21 +40,16 @@ class ConvertToASS(inkex.EffectExtension):
 
         # After this, path will now contain only M, L, C, and Z commands
         path = []
-        prevCmd = None
+        prev_cmd = None
         for idx, segment in enumerate(elem):
-            cmd = segment.letter
-            args = segment.args
-            args = [round_number(num) for num in args]
-            if cmd == "M":
-                path.append("m")
-            elif cmd == "L":
-                if prevCmd != cmd:
-                    path.append("l")
-            elif cmd == "C":
-                if prevCmd != cmd:
-                    path.append("b")
-            path.extend(args)
-            prevCmd = cmd
+            cmd = (segment.letter).lower()
+            if cmd == "z":
+                continue
+            cmd = "b" if cmd == "c" else cmd
+            if cmd != prev_cmd:
+                path.append(cmd)
+                prev_cmd = cmd
+            path.extend([round_number(num) for num in segment.args])
         return " ".join(map(str, path))
 
     def create_ass_tags(self, elem):
@@ -67,8 +62,12 @@ class ConvertToASS(inkex.EffectExtension):
 
         def get_color_attribute(style, attrib):
             color_attr = style.get(attrib)
-            if not color_attr or color_attr == "none":
+
+            if not color_attr:
                 color_str = "black"
+
+            if color_attr == "none":
+                return False
 
             if color_attr and color_attr.startswith("url("):
                 gradient_id = color_attr[5:-1]  # Extract the ID between 'url(#' and ')'
@@ -108,7 +107,7 @@ class ConvertToASS(inkex.EffectExtension):
                 return False
 
         def get_stroke_width_attribute(style):
-            stroke_width = style.get("stroke-width", 0)
+            stroke_width = style.get("stroke-width")
             if not stroke_width:
                 return False
 
@@ -182,15 +181,16 @@ class ConvertToASS(inkex.EffectExtension):
             "polyline",
             "polygon",
         }:
+            ass_tags = self.create_ass_tags(elem)
             # Convert non-path elements to paths
             if elem.TAG != "path":
                 elem = elem.to_path_element()
             path = self.process_path(elem)
-            ass_tags = self.create_ass_tags(elem)
             return self.generate_lines(path, ass_tags)
 
     def recurse_into_group(self, group):
         paths = []
+        group.bake_transforms_recursively()
         for child in group:
             if isinstance(child, inkex.Group):
                 self.recurse_into_group(child)
@@ -201,15 +201,14 @@ class ConvertToASS(inkex.EffectExtension):
     def effect(self):
         # This grabs selected objects by z-order, ordered from bottom to top
         selection_list = self.svg.selection.rendering_order()
-        if len(selection_list) < 1:
+        if len(selection_list) == 0:
             inkex.errormsg("No object was selected!")
             return
 
         paths = []
         for elem in selection_list:
             if isinstance(elem, inkex.Group):
-                group_paths = self.recurse_into_group(elem)
-                paths.extend(group_paths)
+                paths.extend(self.recurse_into_group(elem))
             elif isinstance(elem, inkex.ShapeElement):
                 paths.append(elem)
 
