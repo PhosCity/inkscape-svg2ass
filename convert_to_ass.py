@@ -16,9 +16,14 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "1.0.1"
+__version__ = "1.0.2"
 
 import inkex
+
+
+def round_number(num, decimals=3):
+    rounded = round(float(num), decimals)
+    return int(rounded) if rounded.is_integer() else rounded
 
 
 class ConvertToASS(inkex.EffectExtension):
@@ -39,48 +44,41 @@ class ConvertToASS(inkex.EffectExtension):
         for idx, segment in enumerate(elem):
             cmd = segment.letter
             args = segment.args
-            # Round the values to three digits
-            args = [round(num, 3) if isinstance(num, float) else num for num in args]
+            args = [round_number(num) for num in args]
             if cmd == "M":
                 path.append("m")
-                path.extend(args)
-                startX, startY = args
             elif cmd == "L":
                 if prevCmd != cmd:
                     path.append("l")
-                path.extend(args)
             elif cmd == "C":
                 if prevCmd != cmd:
                     path.append("b")
-                path.extend(args)
-            elif cmd == "Z":
-                if prevCmd != "L":
-                    path.append("l")
-                path.extend([startX, startY])
-                del startX, startY
+            path.extend(args)
             prevCmd = cmd
         return " ".join(map(str, path))
 
     def create_ass_tags(self, elem):
-        def decimal_to_hex(value):
-            value = max(0, min(1, float(value)))
-            return f"&H{int((1 - value) * 255):02X}&"
+        def get_alpha_attribute(style, attrib):
+            if opacity := style.get(attrib):
+                opacity = float(opacity)
+                if opacity != 1.0:
+                    return f"&H{int((1 - opacity) * 255):02X}&"
+            return False
 
         def get_color_attribute(style, attrib):
             color_attr = style.get(attrib)
             if not color_attr or color_attr == "none":
-                return "black"
+                color_str = "black"
 
-            color_str = None
-            # Get first color of the gradient for now
             if color_attr and color_attr.startswith("url("):
                 gradient_id = color_attr[5:-1]  # Extract the ID between 'url(#' and ')'
 
                 # Retrieve the gradient object by its ID
                 gradient = self.svg.getElementById(gradient_id)
 
+                # Get first color of the gradient for now
                 if isinstance(gradient, inkex.LinearGradient):
-                    start_stop = gradient.stops[1]
+                    start_stop = gradient.stops[0]
                     style = start_stop.specified_style()
                     color_str = style.get("stop-color")
                 # TODO: Add support for linear gradients.
@@ -101,9 +99,6 @@ class ConvertToASS(inkex.EffectExtension):
             else:
                 color_str = color_attr
 
-            if not color_str:
-                return False
-
             try:
                 color = inkex.Color(color_str)
                 r, g, b = color.to_rgb()
@@ -112,29 +107,42 @@ class ConvertToASS(inkex.EffectExtension):
             except inkex.ColorIdError:
                 return False
 
+        def get_stroke_width_attribute(style):
+            stroke_width = style.get("stroke-width", 0)
+            if not stroke_width:
+                return False
+
+            paint_order = style.get("paint-order", "normal")
+            if paint_order == "normal":
+                paint_order = "fill stroke markers"
+
+            paint_order = paint_order.split()
+            if paint_order.index("stroke") < paint_order.index("fill"):
+                return round_number(stroke_width, 2) * 0.5
+            else:
+                # TODO: For the most accurate representation of stroke, we need to offset the path inwards by half of stroke width
+                return round_number(stroke_width, 2)
+
         style = elem.specified_style()
         ass_tags = {"an": 7, "bord": 0, "shad": 0, "pos": [0, 0]}
+
+        if opacity := get_alpha_attribute(style, "opacity"):
+            ass_tags["alpha"] = opacity
 
         if fill_color := get_color_attribute(style, "fill"):
             ass_tags["c"] = fill_color
 
-            if fill_opacity := style.get("fill-opacity"):
-                ass_tags["1a"] = decimal_to_hex(fill_opacity)
+            if fill_opacity := get_alpha_attribute(style, "fill-opacity"):
+                ass_tags["1a"] = fill_opacity
 
         if stroke_color := get_color_attribute(style, "stroke"):
             ass_tags["3c"] = stroke_color
 
-            if stroke_width := style.get("stroke-width"):
-                stroke_width = (
-                    int(stroke_width) if stroke_width.isdigit() else float(stroke_width)
-                )
-                # Due to the different semantics of SVG strokes and ASS borders, I'm hard-coding a factor by which we'll change the stroke width
-                # This only works for some stroke order.
-                stroke_width = stroke_width * 0.52549918642
-                ass_tags["bord"] = round(stroke_width, 2)
+            if stroke_opacity := get_alpha_attribute(style, "stroke-opacity"):
+                ass_tags["3a"] = stroke_opacity
 
-            if stroke_opacity := style.get("stroke-opacity"):
-                ass_tags["3a"] = decimal_to_hex(stroke_opacity)
+            if stroke_width := get_stroke_width_attribute(style):
+                ass_tags["bord"] = stroke_width
 
         ass_tags["p"] = 1
 
@@ -182,37 +190,32 @@ class ConvertToASS(inkex.EffectExtension):
             return self.generate_lines(path, ass_tags)
 
     def recurse_into_group(self, group):
-        lines = []
+        paths = []
         for child in group:
             if isinstance(child, inkex.Group):
                 self.recurse_into_group(child)
             elif isinstance(child, inkex.ShapeElement):
-                line = self.process_svg_element(child)
-                if line := self.process_svg_element(child):
-                    lines.append(line)
-        return lines
+                paths.append(child)
+        return paths
 
     def effect(self):
-        lines = []
-
         # This grabs selected objects by z-order, ordered from bottom to top
         selection_list = self.svg.selection.rendering_order()
         if len(selection_list) < 1:
             inkex.errormsg("No object was selected!")
             return
 
+        paths = []
         for elem in selection_list:
             if isinstance(elem, inkex.Group):
-                group_lines = self.recurse_into_group(elem)
-                if len(group_lines):
-                    lines.extend(group_lines)
+                group_paths = self.recurse_into_group(elem)
+                paths.extend(group_paths)
             elif isinstance(elem, inkex.ShapeElement):
-                line = self.process_svg_element(elem)
-                if line:
-                    lines.append(line)
+                paths.append(elem)
 
-        for line in lines:
-            inkex.utils.debug(line)
+        for path in paths:
+            if line := self.process_svg_element(path):
+                inkex.utils.debug(line)
 
 
 if __name__ == "__main__":
