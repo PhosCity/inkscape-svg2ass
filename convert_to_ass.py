@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "1.0.3"
+__version__ = "1.0.4"
 
 import inkex
 
@@ -133,15 +133,17 @@ class ConvertToASS(inkex.EffectExtension):
 
             if fill_opacity := get_alpha_attribute(style, "fill-opacity"):
                 ass_tags["1a"] = fill_opacity
+        else:
+            ass_tags["1a"] = "&HFF&"
 
-        if stroke_color := get_color_attribute(style, "stroke"):
-            ass_tags["3c"] = stroke_color
+        if stroke_width := get_stroke_width_attribute(style):
+            ass_tags["bord"] = stroke_width
+
+            if stroke_color := get_color_attribute(style, "stroke"):
+                ass_tags["3c"] = stroke_color
 
             if stroke_opacity := get_alpha_attribute(style, "stroke-opacity"):
                 ass_tags["3a"] = stroke_opacity
-
-            if stroke_width := get_stroke_width_attribute(style):
-                ass_tags["bord"] = stroke_width
 
         ass_tags["p"] = 1
 
@@ -189,14 +191,12 @@ class ConvertToASS(inkex.EffectExtension):
             return self.generate_lines(path, ass_tags)
 
     def recurse_into_group(self, group):
-        paths = []
-        group.bake_transforms_recursively()
         for child in group:
             if isinstance(child, inkex.Group):
                 self.recurse_into_group(child)
             elif isinstance(child, inkex.ShapeElement):
-                paths.append(child)
-        return paths
+                if line := self.process_svg_element(child):
+                    inkex.utils.debug(line)
 
     def effect(self):
         # This grabs selected objects by z-order, ordered from bottom to top
@@ -205,16 +205,13 @@ class ConvertToASS(inkex.EffectExtension):
             inkex.errormsg("No object was selected!")
             return
 
-        paths = []
         for elem in selection_list:
             if isinstance(elem, inkex.Group):
-                paths.extend(self.recurse_into_group(elem))
+                elem.bake_transforms_recursively()
+                self.recurse_into_group(elem)
             elif isinstance(elem, inkex.ShapeElement):
-                paths.append(elem)
-
-        for path in paths:
-            if line := self.process_svg_element(path):
-                inkex.utils.debug(line)
+                if line := self.process_svg_element(elem):
+                    inkex.utils.debug(line)
 
 
 if __name__ == "__main__":
