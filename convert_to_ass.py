@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "1.0.4"
+__version__ = "1.0.5"
 
 import inkex
 
@@ -61,40 +61,34 @@ class ConvertToASS(inkex.EffectExtension):
             return False
 
         def get_color_attribute(style, attrib):
-            color_attr = style.get(attrib)
+            color_attr = style(attrib)
 
-            if not color_attr:
-                color_str = "black"
-
-            if color_attr == "none":
+            if color_attr is None:
                 return False
 
-            if color_attr and color_attr.startswith("url("):
-                gradient_id = color_attr[5:-1]  # Extract the ID between 'url(#' and ')'
-
-                # Retrieve the gradient object by its ID
-                gradient = self.svg.getElementById(gradient_id)
-
+            if isinstance(color_attr, inkex.LinearGradient):
                 # Get first color of the gradient for now
-                if isinstance(gradient, inkex.LinearGradient):
-                    start_stop = gradient.stops[0]
-                    style = start_stop.specified_style()
-                    color_str = style.get("stop-color")
-                # TODO: Add support for linear gradients.
-                #     # Retrieve gradient attributes
-                #     x1 = gradient.get("x1", "0%")
-                #     y1 = gradient.get("y1", "0%")
-                #     x2 = gradient.get("x2", "100%")
-                #     y2 = gradient.get("y2", "0%")
-                #     # Process stops
-                #     for stop in gradient.stops:
-                #         style = stop.specified_style()
-                #         color = style.get("stop-color")
-                #         opacity = style.get("stop-opacity")
-                #         offset = stop.attrib.get("offset")
-                # elif isinstance(gradient, inkex.RadialGradient):
-                #     inkex.utils.debug("It's radial gradient.")
-                #     # self.process_radial_gradient(gradient)
+                first_stop = color_attr.href.stops[0]
+                fisrt_stop_style = first_stop.specified_style()
+                color_str = fisrt_stop_style.get("stop-color")
+
+                # # TODO: Add support for linear gradients.
+                # # Retrieve gradient attributes
+                # x1 = color_attr.get("x1", "0%")
+                # y1 = color_attr.get("y1", "0%")
+                # x2 = color_attr.get("x2", "100%")
+                # y2 = color_attr.get("y2", "0%")
+                # inkex.errormsg(f"x1: {x1}, y1: {y1}, x2: {x2}, y2: {y2}")
+                # # Process stops
+                # for stop in color_attr.href.stops:
+                #     stop_style = stop.specified_style()
+                #     color = stop_style.get("stop-color")
+                #     opacity = stop_style.get("stop-opacity")
+                #     offset = stop.attrib.get("offset")
+                #     inkex.errormsg(f"color: {color}, opacity: {opacity}, offset: {offset}")
+
+            # elif isinstance(color_attr, inkex.RadialGradient):
+            #     inkex.utils.debug("It's radial gradient.")
             else:
                 color_str = color_attr
 
@@ -144,10 +138,7 @@ class ConvertToASS(inkex.EffectExtension):
             ass_tags["1a"] = "&HFF&"
 
         stroke_color = get_color_attribute(style, "stroke")
-        if (
-            stroke_width := get_stroke_width_attribute(style)
-            and stroke_color is not None
-        ):
+        if (stroke_width := get_stroke_width_attribute(style)) and stroke_color:
             ass_tags["bord"] = stroke_width
             ass_tags["3c"] = stroke_color
 
@@ -156,6 +147,16 @@ class ConvertToASS(inkex.EffectExtension):
 
         ass_tags["p"] = 1
 
+        return ass_tags
+
+    def create_clips(self, elem, ass_tags):
+        clip_path = elem.get("clip-path")
+        if clip_path is None:
+            return ass_tags
+
+        clip_path = clip_path[5:-1]  # Extract the ID between 'url(#' and ')'
+        clip_elem = self.svg.getElementById(clip_path)
+        ass_tags["clip"] = f"({self.process_path(clip_elem.to_path_element())})"
         return ass_tags
 
     def generate_lines(self, path, ass_tags):
@@ -193,6 +194,7 @@ class ConvertToASS(inkex.EffectExtension):
             "polygon",
         }:
             ass_tags = self.create_ass_tags(elem)
+            ass_tags = self.create_clips(elem, ass_tags)
             # Convert non-path elements to paths
             if elem.TAG != "path":
                 elem = elem.to_path_element()
