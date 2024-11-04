@@ -123,7 +123,14 @@ class ConvertToASS(inkex.EffectExtension):
                 return round_number(stroke_width, 2)
 
         style = elem.specified_style()
-        ass_tags = {"an": 7, "bord": 0, "shad": 0, "pos": [0, 0]}
+        ass_tags = {
+            "an": 7,
+            "bord": 0,
+            "shad": 0,
+            "fscx": 100,
+            "fscy": 100,
+            "pos": [0, 0],
+        }
 
         if opacity := get_alpha_attribute(style, "opacity"):
             ass_tags["alpha"] = opacity
@@ -136,11 +143,13 @@ class ConvertToASS(inkex.EffectExtension):
         else:
             ass_tags["1a"] = "&HFF&"
 
-        if stroke_width := get_stroke_width_attribute(style):
+        stroke_color = get_color_attribute(style, "stroke")
+        if (
+            stroke_width := get_stroke_width_attribute(style)
+            and stroke_color is not None
+        ):
             ass_tags["bord"] = stroke_width
-
-            if stroke_color := get_color_attribute(style, "stroke"):
-                ass_tags["3c"] = stroke_color
+            ass_tags["3c"] = stroke_color
 
             if stroke_opacity := get_alpha_attribute(style, "stroke-opacity"):
                 ass_tags["3a"] = stroke_opacity
