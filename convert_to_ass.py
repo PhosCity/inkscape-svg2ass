@@ -194,7 +194,8 @@ class ShapeProcessor:
         elem = elem.to_absolute()
 
         viewBoxScale = self.svg.scale
-        elem.scale(viewBoxScale, viewBoxScale, True)
+        if viewBoxScale != 1:
+            elem.scale(viewBoxScale, viewBoxScale, True)
 
         # After this, path will now contain only M, L, C, and Z commands
         path = []
