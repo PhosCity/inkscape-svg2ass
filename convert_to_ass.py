@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-__version__ = "1.0.6"
+__version__ = "1.0.7"
 
 import inkex
 
@@ -184,7 +184,6 @@ class ShapeProcessor:
 
         if shape_elem is None:
             shape_elem = self.element
-
         # Apply any transformations and viewBox scaling
         shape_elem.apply_transform()
 
@@ -193,6 +192,9 @@ class ShapeProcessor:
 
         # Convert all commands to absolute positions
         elem = elem.to_absolute()
+
+        viewBoxScale = self.svg.scale
+        elem.scale(viewBoxScale, viewBoxScale, True)
 
         # After this, path will now contain only M, L, C, and Z commands
         path = []

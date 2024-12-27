@@ -4,10 +4,15 @@
     <id>convert_to_ass</id>
     <param name="output_format" type="optiongroup" appearance="radio"
         gui-text="Output Format">
-        <option value="line" default="true">Line</option>
-        <option value="drawing">Drawing</option>
-        <option value="clip">\clip</option>
-        <option value="iclip">\iclip</option>
+        <option value="line" default="true" gui-description="Full ass line">Line</option>
+        <option value="drawing" gui-description="Tags + Shape">Drawing</option>
+        <option value="clip" gui-description="Shape inside clip tag">\clip</option>
+        <option value="iclip"  gui-description="Shape inside iclip tag">\iclip</option>
+    </param>
+    <param name="stroke_preservation" type="optiongroup" appearance="radio"
+        gui-text="Stroke Preservation">
+        <option value="strict" default="true" gui-description="Enforce fill over stroke order">Strict</option>
+        <option value="use_path_effects" gui-description="Use path effect to try to get proper stroke">Use Path Effects</option>Line
     </param>
     <effect needs-live-preview="false">
         <effects-menu>
